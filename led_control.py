@@ -1,7 +1,6 @@
 import time
 from gpiozero import RGBLED
-
-
+from threading import Lock
 
 FLICKER_TIME = 3
 FLICKER_TIME_LONG = 8
@@ -21,8 +20,10 @@ blue_gpio = 4
 
 led = RGBLED(red_gpio, green_gpio, blue_gpio, active_high=False)
 
+led_mutex = Lock()
 
 def flicker_led(flicker_color, flicker_interval=FLICKER_INTERVAL, flicker_time=FLICKER_TIME):
+    led_mutex.acquire()
     current_flicker_timer = flicker_time
     while current_flicker_timer > 0:
         led.color = flicker_color
@@ -30,4 +31,5 @@ def flicker_led(flicker_color, flicker_interval=FLICKER_INTERVAL, flicker_time=F
         led.off()
         time.sleep(flicker_interval)
         current_flicker_timer -= flicker_interval * 2
+    led_mutex.release()
 

@@ -1,6 +1,7 @@
 import time
 import random
 import RPi.GPIO as gpio
+from threading import Lock
 
 BUZZER_GPIO = 14
 
@@ -18,6 +19,7 @@ ALERT_CYCLES = 2
 
 RANDOM_PLAY_TIME = 1
 
+buzzer_mutex = Lock()
 
 def rising_buzz():
     for i in range(FREQ_START, FREQ_END, FREQ_STEP):
@@ -44,9 +46,11 @@ def random_buzz():
 
 
 def alert():
+    buzzer_mutex.acquire()
     print("Alerting...")
     for i in range(ALERT_CYCLES):
         rising_buzz()
-        random_buzz()
         falling_buzz()
+
+    buzzer_mutex.release()
 

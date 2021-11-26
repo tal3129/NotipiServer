@@ -3,7 +3,7 @@
 import socket
 import struct
 import time
-import threading
+from threading import Thread, Lock
 import bluetooth
 import led_control
 import buzzer_control
@@ -11,8 +11,8 @@ import buzzer_control
 uuid="00001101-0000-1000-8000-00805F9B34FB"
 size = 1024
 
-HEADER_MESSAGE = "BB"
-HEADER_MESSAGE_SIZE = struct.calcsize(HEADER_MESSAGE)
+MESSAGE_HEADER = "BB"
+HEADER_MESSAGE_SIZE = struct.calcsize(MESSAGE_HEADER)
 colors = {
     1: led_control.COLOR_RED,
     2: led_control.COLOR_GREEN,
@@ -22,43 +22,48 @@ colors = {
 
 def handle_message(message):
     print("New Message: ", list(message))
-    if len(message) != HEADER_MESSAGE_SIZE:
+    if len(message) < HEADER_MESSAGE_SIZE:
         return
 
-    color_index, call_flicker = struct.unpack(HEADER_MESSAGE, message)
+    color_index, call_flicker = struct.unpack(MESSAGE_HEADER, message[:HEADER_MESSAGE_SIZE])
+
     if call_flicker:
-        alert_thread = threading.Thread(target=buzzer_control.alert)
-        alert_thread.start()
-        led_control.flicker_led(colors[color_index], led_control.FLICKER_INTERVAL_SHORT, led_control.FLICKER_TIME_LONG)
+        Thread(target=buzzer_control.alert).start()
+        Thread(target=led_control.flicker_led, args=[colors[color_index], led_control.FLICKER_INTERVAL_SHORT, led_control.FLICKER_TIME_LONG]).start()
     else:
-        led_control.flicker_led(colors[color_index])
+        Thread(target=led_control.flicker_led, args=[colors[color_index]]).start()
+
+
+def handle_client(client_sock):
+    try:
+        while True:
+            data, addr = client_sock.recvfrom(size)
+            if not data:
+                print("Client disconnected")
+                return
+            handle_message(data.decode("UTF-8"))
+    except bluetooth.BluetoothError as e:
+        print(e)
+        return
 
 
 def main():
     led_control.flicker_led(led_control.COLOR_BLUE)
-    
     port = bluetooth.PORT_ANY
-    s = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
-    s.bind(("",port))
+    server = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
+    server.bind(("",port))
 
-    s.listen(1)
-    bluetooth.advertise_service(s, "SampleServer", service_id = uuid,
+    server.listen(1)
+    bluetooth.advertise_service(server, "SampleServer", service_id = uuid,
                                 service_classes = [ uuid, bluetooth.SERIAL_PORT_CLASS ],
-                                profiles = [ bluetooth.SERIAL_PORT_PROFILE ]) 
+                                profiles = [ bluetooth.SERIAL_PORT_PROFILE ])
     while True:
         print("Listening for client connection...")
-        client_sock, address = s.accept()
-        print("new client:", address)
+        client_sock, address = server.accept()
+        print("New client:", address)
 
         # Handle new client
-        try:
-            data, addr = client_sock.recvfrom(size)
-            while data:
-                handle_message(data.decode("UTF-8"))
-                data, addr = client_sock.recvfrom(size)
-        except bluetooth.BluetoothError as e:
-            print(e)
-            continue
+        threading.Thread(target=handle_client, args=[client_sock]).start()
 
 
 if __name__ == "__main__":
