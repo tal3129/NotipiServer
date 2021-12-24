@@ -1,17 +1,19 @@
 #!/usr/bin/python
 
+import threading
 import socket
 import struct
 import time
 from threading import Thread, Lock
 import bluetooth
 import led_control
+import lcd_control
 import buzzer_control
 
 uuid="00001101-0000-1000-8000-00805F9B34FB"
 size = 1024
 
-MESSAGE_HEADER = "BB"
+MESSAGE_HEADER = "BBH"
 HEADER_MESSAGE_SIZE = struct.calcsize(MESSAGE_HEADER)
 colors = {
     1: led_control.COLOR_RED,
@@ -25,14 +27,17 @@ def handle_message(message):
     if len(message) < HEADER_MESSAGE_SIZE:
         return
 
-    color_index, call_flicker = struct.unpack(MESSAGE_HEADER, message[:HEADER_MESSAGE_SIZE])
-
-    if call_flicker:
+    color_index, is_call, payload_length = struct.unpack(MESSAGE_HEADER, message[:HEADER_MESSAGE_SIZE])
+    payload = message[HEADER_MESSAGE_SIZE:].decode("utf-8")
+    print(payload)
+    lcd_control.clear_screen()
+    lcd_control.write(payload)
+    
+    if is_call:
         Thread(target=buzzer_control.alert).start()
         Thread(target=led_control.flicker_led, args=[colors[color_index], led_control.FLICKER_INTERVAL_SHORT, led_control.FLICKER_TIME_LONG]).start()
     else:
         Thread(target=led_control.flicker_led, args=[colors[color_index]]).start()
-
 
 def handle_client(client_sock):
     try:
@@ -41,14 +46,14 @@ def handle_client(client_sock):
             if not data:
                 print("Client disconnected")
                 return
-            handle_message(data.decode("UTF-8"))
+            handle_message(data)
     except bluetooth.BluetoothError as e:
         print(e)
         return
 
 
 def main():
-    led_control.flicker_led(led_control.COLOR_BLUE)
+    Thread(target=led_control.flicker_led, args=[led_control.COLOR_RED]).start()
     port = bluetooth.PORT_ANY
     server = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
     server.bind(("",port))
@@ -60,6 +65,7 @@ def main():
     while True:
         print("Listening for client connection...")
         client_sock, address = server.accept()
+        Thread(target=led_control.flicker_led, args=[led_control.COLOR_RED], kwargs={"flicker_time": 1}).start()
         print("New client:", address)
 
         # Handle new client

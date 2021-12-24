@@ -3,7 +3,7 @@ import random
 import RPi.GPIO as gpio
 from threading import Lock
 
-BUZZER_GPIO = 14
+BUZZER_GPIO = 17
 
 gpio.setmode(gpio.BCM)
 gpio.setwarnings(False)
