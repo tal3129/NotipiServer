@@ -23,8 +23,9 @@ class NotipiServer():
     def __init__(self):
         self.reactor = Reactor()
         Thread(target=led_control.flicker_led, args=[led_control.COLOR_RED]).start()
+        self.register_server()
 
-    def run(self):
+    def register_server(self):
         port = bluetooth.PORT_ANY
         server = bluetooth.BluetoothSocket(bluetooth.RFCOMM)
         server.bind(("",port))
@@ -33,6 +34,9 @@ class NotipiServer():
                                     service_classes = [ uuid, bluetooth.SERIAL_PORT_CLASS ],
                                     profiles = [ bluetooth.SERIAL_PORT_PROFILE ])
         self.reactor.register_read(server, self.server_handler)
+
+    def run(self):
+        self.reactor.run()
 
     def server_handler(self, server):
         client_sock, address = server.accept()
