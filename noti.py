@@ -36,6 +36,7 @@ class NotipiServer():
         self.reactor.register_read(server, self.server_handler)
 
     def run(self):
+        print("Listening for clients...")
         self.reactor.run()
 
     def server_handler(self, server):
@@ -57,12 +58,12 @@ class NotipiServer():
         self.reactor.unregister(client_sock)
 
     def handle_message(self, message):
-        print(f"New Message: {list(message[:HEADER_MESSAGE_SIZE])}...")
+        print(f"New Message: {list(message[:HEADER_MESSAGE_SIZE])}")
         if len(message) < HEADER_MESSAGE_SIZE:
             return
 
         color_index, is_call, payload_length = struct.unpack(MESSAGE_HEADER, message[:HEADER_MESSAGE_SIZE])
-        payload = message[HEADER_MESSAGE_SIZE:HEADER_MESSAGE_SIZE + payload_length].decode("utf-8")
+        payload = message[HEADER_MESSAGE_SIZE:HEADER_MESSAGE_SIZE + payload_length].decode(encoding="utf-8", errors="ignore")
         print(payload)
 
         # Write to LCD
